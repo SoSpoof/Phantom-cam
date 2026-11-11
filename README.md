@@ -16,5 +16,5 @@ getgenv().PhantomCamConfig = {
     UnloadKey = Enum.KeyCode.End,
 }
 
-loadstring(game:HttpGet("https://raw.githubusercontent.com/WhyWKey/linoria/main/phantomcam.lua"))()
+loadstring(game:HttpGet("https://raw.githubusercontent.com/SoSpoof/Phantom-cam/refs/heads/main/phantomcam.lua"))()
 ```
