@@ -1,4 +1,4 @@
-local SOURCE_URL = "https://raw.githubusercontent.com/WhyWKey/linoria/main/phantomcam.lua"
+local SOURCE_URL = "https://raw.githubusercontent.com/SoSpoof/Phantom-cam/main/phantomcam.lua"
 
 local HOST = getgenv().PhantomCamHost == true
 getgenv().PhantomCamHost = nil
