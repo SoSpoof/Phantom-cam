@@ -9,6 +9,8 @@ local Workspace = game:GetService("Workspace")
 
 local MAX_TURN = 0.6
 local MAX_PITCH = 1.5
+local MAX_SHIFT = 1.5
+local REST_RATE = 0.5
 
 for _, name in ipairs({ "PhantomCamApi", "PhantomCam" }) do
     local previous = getgenv()[name]
@@ -210,7 +212,7 @@ function Cam.applyFov(camera, value)
 end
 
 function Cam.reset()
-    Cam.amount, Cam.smoothed, Cam.smoothedPos, Cam.written = 0, nil, nil, nil
+    Cam.amount, Cam.smoothed, Cam.smoothedPos, Cam.written, Cam.rest = 0, nil, nil, nil, nil
 end
 
 function Cam.step(dt)
@@ -233,8 +235,8 @@ function Cam.step(dt)
     Cam.applyFov(camera, s.fov)
     local weapon = Cam.weapon()
     local barrel = weapon and Cam.barrel(weapon)
-    local head = world and Cam.head()
-    if not barrel and not head then
+    local alive = world and (Cam.head() ~= nil or weapon ~= nil)
+    if not barrel and not alive then
         hiding(false)
         Cam.reset()
         return
@@ -247,9 +249,10 @@ function Cam.step(dt)
     hiding(world and Cam.amount > 0.05)
     local idle = not world and s.strength <= 0 and s.position <= 0
     if Cam.amount < 0.002 or idle then
-        Cam.smoothed, Cam.smoothedPos, Cam.written = nil, nil, nil
+        Cam.smoothed, Cam.smoothedPos, Cam.written, Cam.rest = nil, nil, nil, nil
         return
     end
+    if world and not barrel then note("world", "world character: no weapon/viewmodel motion source, view stays on the game camera") end
     barrel = barrel or frame
 
     local gx, gy, gz = frame:ToOrientation()
@@ -257,9 +260,20 @@ function Cam.step(dt)
     local dx, dy = bx - gx, wrap(by - gy)
     local size = math.sqrt(dx * dx + dy * dy)
     if size > MAX_TURN then dx, dy = dx * MAX_TURN / size, dy * MAX_TURN / size end
-    local rawTurn = Vector3.new(dx, dy, s.roll and wrap(bz - gz) or 0)
+    local rawTurn = Vector3.new(dx, dy, (s.roll or world) and wrap(bz - gz) or 0)
     local rawPos = Vector3.zero
-    if not world and s.position > 0 then rawPos = frame:PointToObjectSpace(barrel.Position) * s.position end
+    local rel = frame:PointToObjectSpace(barrel.Position)
+    if world then
+        Cam.rest = Cam.rest or rel
+        if not aiming then
+            local motion = rel - Cam.rest
+            if motion.Magnitude > MAX_SHIFT then motion = motion.Unit * MAX_SHIFT end
+            rawPos = motion * s.strength
+            Cam.rest = Cam.rest + (rel - Cam.rest) * (1 - math.exp(-dt * REST_RATE))
+        end
+    elseif s.position > 0 then
+        rawPos = rel * s.position
+    end
 
     if Cam.smoothed and s.smoothing > 0 then
         local rate = 1 + 59 * (1 - math.clamp(s.smoothing, 0, 1)) ^ 2
@@ -275,10 +289,7 @@ function Cam.step(dt)
     local origin = frame:PointToWorldSpace(Cam.smoothedPos * Cam.amount)
     local pitch = math.clamp(gx + turn.X * k, -MAX_PITCH, MAX_PITCH)
     local rotation = CFrame.fromOrientation(pitch, gy + turn.Y * k, gz + turn.Z * k)
-    if head then
-        local eye = head + rotation.LookVector * s.forward
-        origin = frame.Position + (eye - frame.Position) * Cam.amount
-    end
+    if world then origin = origin + rotation.LookVector * (s.forward * Cam.amount) end
     camera.CFrame = CFrame.new(origin) * rotation
     Cam.written = camera.CFrame
 end
